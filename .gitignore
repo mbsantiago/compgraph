@@ -1,0 +1,5 @@
+# Compiled python
+*.pyc
+
+# Built Documentation
+build/
