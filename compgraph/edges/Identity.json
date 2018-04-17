@@ -1,0 +1,10 @@
+{
+	"name": "Identity",
+	"inputs": ["input"],
+	"outputs": ["output"],
+	"defaults": [],
+	"shape_transformations": {
+		"output": "$input"
+	},
+	"description": "This operation creates a copy of its input."
+}

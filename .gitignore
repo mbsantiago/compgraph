@@ -1,5 +1,16 @@
 # Compiled python
 *.pyc
 
+# Tox
+.tox
+*.egg-info/
+
+# Coverage
+.coverage/
+.coveragerc
+
 # Built Documentation
 build/
+
+#pytest
+.pytest_cache/
