@@ -6,7 +6,7 @@
 *.egg-info/
 
 # Coverage
-.coverage/
+.coverage
 .coveragerc
 
 # Built Documentation
@@ -14,3 +14,6 @@ build/
 
 #pytest
 .pytest_cache/
+
+# Cache
+.chache/
