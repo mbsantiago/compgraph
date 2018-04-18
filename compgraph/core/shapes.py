@@ -1,3 +1,5 @@
+from __future__ import division
+
 
 class InvalidShapeError(Exception):
     pass
@@ -12,9 +14,9 @@ def validate_shape(shape):
             msg += '{}'.format(exp)
             raise InvalidShapeError(msg)
     for dim in shape:
-        if (not isinstance(dim, int)) or (dim is None):
+        if (not isinstance(dim, (int, float))) or (dim is None):
             msg = '{} is no a valid shape.'.format(shape)
-            raise InvalidShapeError('{} is not a valid shape')
+            raise InvalidShapeError(msg)
 
 
 class Shape(object):
@@ -31,11 +33,59 @@ class Shape(object):
         validate_shape(shape)
         self._shape = new_shape
 
+    def __add__(self, other):
+        if isinstance(other, Shape):
+            return Shape([x+y for x, y in zip(self.shape, other.shape)])
+        if isinstance(other, int):
+            return Shape([x + other for x in self.shape])
 
+    def __mul__(self, other):
+        if isinstance(other, Shape):
+            return Shape([x * y for x, y in zip(self.shape, other.shape)])
+        if isinstance(other, int):
+            return Shape([x * other for x in self.shape])
 
-EXAMPLES = '''
+    def __div__(self, other):
+        if isinstance(other, Shape):
+            return Shape([x / y for x, y in zip(self.shape, other.shape)])
+        if isinstance(other, int):
+            return Shape([x / other for x in self.shape])
 
-    floor($output1[:-1] )
+    def __truediv__(self, other):
+        if isinstance(other, Shape):
+            return Shape([x / y for x, y in zip(self.shape, other.shape)])
+        if isinstance(other, int):
+            return Shape([x / other for x in self.shape])
 
+    def __sub__(self, other):
+        if isinstance(other, Shape):
+            return Shape([x - y for x, y in zip(self.shape, other.shape)])
+        if isinstance(other, int):
+            return Shape([x - other for x in self.shape])
 
-'''
+    def __mod__(self, other):
+        if isinstance(other, Shape):
+            return Shape([x % y for x, y in zip(self.shape, other.shape)])
+        if isinstance(other, int):
+            return Shape([x % other for x in self.shape])
+
+    def __repr__(self):
+        return str(self._shape)
+
+    def __getitem__(self, key):
+        return self._shape[key]
+
+    def __iter__(self):
+        return iter(self._shape)
+
+    def __eq__(self, other):
+        if isinstance(other, Shape):
+            other = other.shape
+        for x, y in zip(self.shape, other):
+            if x != y:
+                return False
+        return True
+
+    @staticmethod
+    def concat(shape1, shape2):
+        return Shape(shape1.shape + shape2.shape)

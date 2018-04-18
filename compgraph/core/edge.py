@@ -5,13 +5,15 @@ import uuid
 import json
 
 from compgraph.utils import make_namespace_from_dict
+from compgraph.core.parser import make_parser
+from compgraph.core.parser import parse_transformation
 
 MANDATORY_FIELDS = [
     'name',
     'inputs',
     'outputs',
     'shape_transformations',
-    'defaults',
+    'parameters',
     'description'
 ]
 
@@ -44,12 +46,8 @@ class EdgeDescription(object):
     def __init__(self, dictionary):
         type(self).check_field_validity(dictionary)
 
-        self.name = dictionary['name']
-        self.inputs = dictionary['inputs']
-        self.outputs = dictionary['outputs']
-        self.shape_tranformations = dictionary['shape_transformations']
-        self.defaults = dictionary['defaults']
-        self.description = dictionary['description']
+        for key in MANDATORY_FIELDS:
+            setattr(self, key, dictionary[key])
 
         other_keys = [
             key for key in dictionary
@@ -65,13 +63,11 @@ class EdgeDescription(object):
         if output not in self.outputs:
             raise ValueError('Output {} is not part of Edge description'.format(output))
 
-
-
     def __repr__(self):
         msg = 'Edge {}:\n\t{}'.format(self.name, self.description)
         return msg
 
-    class InvalidEdgeDescription(Exception):
+    class InvalidDescription(Exception):
         pass
 
     @staticmethod
@@ -81,7 +77,7 @@ class EdgeDescription(object):
                 msg = '{} field is missing from '.format(field)
                 msg += 'edge description: \n'
                 msg += '\t{}'.format(dictionary)
-                raise InvalidEdgeDescription(msg)
+                raise EdgeDescription.InvalidDescription(msg)
 
 
 def build_class_from_description(description):
@@ -106,6 +102,13 @@ def build_class_from_description(description):
     newclass = type(name, (Edge,), methods)
     return newclass
 
+def parse_transformations(path):
+    descriptions = load_edges_from_directory(path)
+    parser = make_parser()
+
+    for description in descriptions:
+        parse_transformation(parser, description)
+
 
 def load_edges_from_directory(path):
     all_edges_in_path = glob.glob(os.path.join(path, '*.json'))
@@ -115,3 +118,5 @@ def load_edges_from_directory(path):
             description = json.load(jsonfile)
         edge_descriptions.append(EdgeDescription(description))
     return edge_descriptions
+
+parse_transformations('../edges/')

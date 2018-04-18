@@ -7,5 +7,6 @@ setup(
     author='CONABIO',
     license='MIT',
     packages=['compgraph', 'tests'],
+    install_requires=['lark-parser'],
     zip_safe=False
 )

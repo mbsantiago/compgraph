@@ -8,12 +8,17 @@
 # Coverage
 .coverage
 .coveragerc
+htmlcov/
 
-# Built Documentation
+# Build
 build/
+*.egg-info/
 
 #pytest
 .pytest_cache/
 
 # Cache
-.chache/
+.cache/
+
+# Vim swaps
+*.swp
