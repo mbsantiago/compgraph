@@ -1,0 +1,25 @@
+{
+    "name": "Convolution",
+    "inputs": ["input"],
+    "outputs": ["output"],
+    "shape_transformations": {
+        "output": "$input[:0]:(($padding==SAME*ceil($input[1:-1]/$strides))+($padding==VALID*ceil(($input[1:-1]-(($window_size-1)*$dilation_rate))/$strides))):[#channels]"
+    },
+    "attributes": [
+        "channels",
+        "window_size",
+        "padding",
+        "strides",
+        "dilation_rate"
+    ],
+    "variables": {
+         "kernel": "$window_size"
+    },
+    "defaults": {
+        "window_size": "[3] * (dim($input) - 2)",
+        "padding": "SAME",
+        "strides": "[1] * (dim($input) - 2)",
+        "dilation_rate": "[1] * (dim($input) - 2)"
+    },
+    "description":"Una operacion de convolucion."
+}

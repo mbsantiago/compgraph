@@ -36,37 +36,37 @@ class Shape(object):
     def __add__(self, other):
         if isinstance(other, Shape):
             return Shape([x+y for x, y in zip(self.shape, other.shape)])
-        if isinstance(other, int):
+        if isinstance(other, (int, float)):
             return Shape([x + other for x in self.shape])
 
     def __mul__(self, other):
         if isinstance(other, Shape):
             return Shape([x * y for x, y in zip(self.shape, other.shape)])
-        if isinstance(other, int):
+        if isinstance(other, (int, float)):
             return Shape([x * other for x in self.shape])
 
     def __div__(self, other):
         if isinstance(other, Shape):
             return Shape([x / y for x, y in zip(self.shape, other.shape)])
-        if isinstance(other, int):
+        if isinstance(other, (int, float)):
             return Shape([x / other for x in self.shape])
 
     def __truediv__(self, other):
         if isinstance(other, Shape):
             return Shape([x / y for x, y in zip(self.shape, other.shape)])
-        if isinstance(other, int):
+        if isinstance(other, (int, float)):
             return Shape([x / other for x in self.shape])
 
     def __sub__(self, other):
         if isinstance(other, Shape):
             return Shape([x - y for x, y in zip(self.shape, other.shape)])
-        if isinstance(other, int):
+        if isinstance(other, (int, float)):
             return Shape([x - other for x in self.shape])
 
     def __mod__(self, other):
         if isinstance(other, Shape):
             return Shape([x % y for x, y in zip(self.shape, other.shape)])
-        if isinstance(other, int):
+        if isinstance(other, (int, float)):
             return Shape([x % other for x in self.shape])
 
     def __repr__(self):

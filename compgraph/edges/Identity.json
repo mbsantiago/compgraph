@@ -2,7 +2,7 @@
 	"name": "Identity",
 	"inputs": ["input"],
 	"outputs": ["output"],
-	"parameters": [],
+	"attributes": [],
 	"shape_transformations": {
 		"output": "$input"
 	},

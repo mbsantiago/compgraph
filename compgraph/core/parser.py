@@ -6,24 +6,26 @@ from lark import Lark
 from compgraph.core.shapes import Shape
 
 GRAMMAR = '''
-start: expresion
+expression: shape
     | numeric
 
-expresion.100 : ATOMIC -> atomic
-    | expresion op expresion -> expresion_op
-    | "(" expresion op expresion ")" -> expresion_op_braces
-    | expresion ":" expresion -> expresion_concat
-    | expresion "[" slice "]" -> expresion_slice
-    | numeric op expresion -> expresion_nl_op
-    | expresion op numeric -> expresion_nr_op
-    | func "(" expresion ")" -> func
+shape.100 : ATOMIC -> atomic
+    | shape op shape -> operation
+    | "(" shape op shape ")" -> operation
+    | shape ":" shape -> shape_concat
+    | shape "[" slice "]" -> shape_slice
+    | numeric op shape -> operation
+    | shape op numeric -> operation
+    | func "(" shape ")" -> func
+    | shape "[" list "]" -> shape_list
+    | shape "[" shape "]" -> shape_list
+    | "(" shape ")" -> parens
     | "[" list "]" -> constant_shape
+    | "[" numeric "]" -> constant_shape
 
-list: [list ","] numeric
+list: (numeric ",")+ numeric
 
-slice : expresion -> slice_from_expresion
-    | list -> slice_from_expresion
-    | numeric ":" numeric -> normal_slice
+slice : numeric ":" numeric -> normal_slice
     | numeric ":" -> start_slice
     | ":" numeric -> end_slice
     | numeric ":" numeric ":" numeric -> full_strided_slice
@@ -32,17 +34,21 @@ slice : expresion -> slice_from_expresion
     | "::" numeric -> strided_slice
 
 numeric : SIGNED_NUMBER -> atomic_number
-    | expresion "[" numeric "]" -> expresion_get
-    | numeric op numeric -> numeric_op
+    | shape "[" numeric "]" -> shape_get
+    | numeric op numeric -> operation
     | func "(" numeric ")" -> func
-    | ATOMIC -> atomic
+    | numfunc "(" shape ")" -> func
+    | ATOMIC_NUM -> atomic
     | ATOMIC "==" LITERAL -> literal_match
-    | "(" numeric ")" -> braced_numeric
+    | ATOMIC_NUM "==" LITERAL -> literal_match
+    | "(" numeric ")" -> parens
 
 func: "floor" -> floor
     | "ceil" -> ceiling
-    | "prod" -> product
+
+numfunc: "prod" -> product
     | "sum" -> sum
+    | "dim" -> dim
 
 op: "/" -> div
     | "*" -> prod
@@ -51,8 +57,8 @@ op: "/" -> div
     | "-" -> sub
 
 ATOMIC : "$" /\w+/
-
-LITERAL : "#" /\w+/
+ATOMIC_NUM : "#" /\w+/
+LITERAL : /\w+/
 %import common.SIGNED_NUMBER
 %import common.WS
 %ignore WS
@@ -60,28 +66,34 @@ LITERAL : "#" /\w+/
 
 
 def make_parser():
-    parser = Lark(GRAMMAR)
+    parser = Lark(GRAMMAR, start='expression')
     return parser
 
 
 def parse_transformation(parser, edge_description):
     for output_name, transformation in edge_description.shape_transformations.items():
-        print(parser.parse(transformation))
+        pass
 
 
 def evaluate_node(node, **kwargs):
-    if node.data == 'start':
-        return evaluate_node(node.children[0], **kwargs)
+    node_type = node.data
+    childs = node.children
 
-    if node.data == 'atomic':
-        value = kwargs[node.children[0].value[1:]]
+    if node_type == 'expression':
+        return evaluate_node(childs[0], **kwargs)
+
+    if node_type == 'atomic':
+        value = kwargs[childs[0].value[1:]]
         if isinstance(value, (list, tuple)):
             value = Shape(value)
+        else:
+            value = float(value)
         return value
-    if '_op' in node.data:
-        argument1 = evaluate_node(node.children[0], **kwargs)
-        argument2 = evaluate_node(node.children[2], **kwargs)
-        operation = node.children[1]
+
+    if node_type == 'operation':
+        argument1 = evaluate_node(childs[0], **kwargs)
+        argument2 = evaluate_node(childs[2], **kwargs)
+        operation = childs[1]
         if operation.data == 'add':
             return argument1 + argument2
         if operation.data == 'prod':
@@ -93,66 +105,62 @@ def evaluate_node(node, **kwargs):
         if operation.data == 'mod':
             return argument1 % argument2
 
-    if node.data == 'list':
-        current = node
-        values = [evaluate_node(current.children[-1], **kwargs)]
-        while len(current.children) > 1:
-            current = current.children[0]
-            values.append(evaluate_node(current.children[-1], **kwargs))
-        return Shape(values[::-1])
+    if node_type == 'list':
+        values = [
+            evaluate_node(child, **kwargs)
+            for child in childs
+        ]
+        return Shape(values)
 
-    if node.data == 'atomic_number':
-        return int(node.children[0].value)
+    if node_type == 'shape_list':
+        shape = evaluate_node(childs[0], **kwargs)
+        shape_list = evaluate_node(childs[1], **kwargs)
+        return Shape([shape[x] for x in shape_list])
 
-    if node.data == 'expresion_slice':
-        argument1 = evaluate_node(node.children[0], **kwargs)
-        argument2 = evaluate_node(node.children[1], **kwargs)
+    if node_type == 'atomic_number':
+        return int(childs[0].value)
 
-        if isinstance(argument2, Shape):
-            return Shape([argument1[x] for x in argument2])
+    if node_type == 'shape_slice':
+        shape = evaluate_node(childs[0], **kwargs)
+        shape_slice = evaluate_node(childs[1], **kwargs)
+        return Shape(shape[shape_slice])
 
-        if isinstance(argument2, slice):
-            return Shape(argument1[argument2])
+    if node_type == 'normal_slice':
+        start = evaluate_node(childs[0], **kwargs)
+        end = evaluate_node(childs[1], **kwargs)
+        return slice(start, end)
 
-    if node.data == 'slice_from_expresion':
-        return evaluate_node(node.children[0], **kwargs)
+    if node_type == 'start_slice':
+        start = evaluate_node(childs[0], **kwargs)
+        return slice(start, None)
 
-    if node.data == 'normal_slice':
-        argument1 = evaluate_node(node.children[0], **kwargs)
-        argument2 = evaluate_node(node.children[1], **kwargs)
-        return slice(argument1, argument2)
+    if node_type == 'end_slice':
+        end = evaluate_node(childs[0], **kwargs)
+        return slice(None, end)
 
-    if node.data == 'start_slice':
-        argument1 = evaluate_node(node.children[0], **kwargs)
-        return slice(argument1, None)
+    if node_type == 'full_strided_slice':
+        start = evaluate_node(childs[0], **kwargs)
+        end = evaluate_node(childs[1], **kwargs)
+        stride = evaluate_node(childs[2], **kwargs)
+        return slice(start, end, stride)
 
-    if node.data == 'end_slice':
-        argument1 = evaluate_node(node.children[0], **kwargs)
-        return slice(None, argument1)
+    if node_type == 'strided_slice':
+        stride = evaluate_node(childs[0], **kwargs)
+        return slice(None, None, stride)
 
-    if node.data == 'full_strided_slice':
-        argument1 = evaluate_node(node.children[0], **kwargs)
-        argument2 = evaluate_node(node.children[1], **kwargs)
-        argument3 = evaluate_node(node.children[2], **kwargs)
-        return slice(argument1, argument2, argument3)
+    if node_type == 'end_strided_slice':
+        end = evaluate_node(childs[0], **kwargs)
+        stride = evaluate_node(childs[1], **kwargs)
+        return slice(None, end, stride)
 
-    if node.data == 'strided_slice':
-        argument1 = evaluate_node(node.children[0], **kwargs)
-        return slice(None, None, argument1)
+    if node_type == 'start_strided_slice':
+        start = evaluate_node(childs[0], **kwargs)
+        stride = evaluate_node(childs[1], **kwargs)
+        return slice(start, None, stride)
 
-    if node.data == 'end_strided_slice':
-        argument1 = evaluate_node(node.children[0], **kwargs)
-        argument2 = evaluate_node(node.children[1], **kwargs)
-        return slice(None, argument1, argument2)
-
-    if node.data == 'start_strided_slice':
-        argument1 = evaluate_node(node.children[0], **kwargs)
-        argument2 = evaluate_node(node.children[1], **kwargs)
-        return slice(argument1, None, argument2)
-
-    if node.data == 'func':
-        func = node.children[0].data
-        argument = evaluate_node(node.children[1], **kwargs)
+    if node_type == 'func':
+        func = childs[0].data
+        argument = evaluate_node(childs[1], **kwargs)
         if func == 'floor':
             if isinstance(argument, (int, float)):
                 return int(math.floor(argument))
@@ -160,6 +168,8 @@ def evaluate_node(node, **kwargs):
                 return [int(math.floor(dim)) for dim in argument]
         if func == 'sum':
             return int(sum(argument))
+        if func == 'dim':
+            return len(argument)
         if func == 'ceiling':
             if isinstance(argument, (int, float)):
                 return int(math.ceil(argument))
@@ -171,32 +181,34 @@ def evaluate_node(node, **kwargs):
                 product *= dim
             return product
 
-    if node.data == 'expresion_concat':
-        argument1 = evaluate_node(node.children[0], **kwargs)
-        argument2 = evaluate_node(node.children[1], **kwargs)
-        return Shape.concat(argument1, argument2)
+    if node_type == 'shape_concat':
+        shape1 = evaluate_node(childs[0], **kwargs)
+        shape2 = evaluate_node(childs[1], **kwargs)
+        return Shape.concat(shape1, shape2)
 
-    if node.data == 'constant_shape':
-        return evaluate_node(node.children[0], **kwargs)
+    if node_type == 'constant_shape':
+        return evaluate_node(childs[0], **kwargs)
 
-    if node.data == 'expresion_get':
-        argument1 = evaluate_node(node.children[0], **kwargs)
-        argument2 = evaluate_node(node.children[1], **kwargs)
-        return argument1[argument2]
+    if node_type == 'shape_get':
+        shape = evaluate_node(childs[0], **kwargs)
+        index = evaluate_node(childs[1], **kwargs)
+        return shape[index]
 
-    if node.data == 'braced_numeric':
-        return evaluate_node(node.children[0], **kwargs)
+    if node_type == 'parens':
+        return evaluate_node(childs[0], **kwargs)
 
-    if node.data == 'literal_match':
-        variable = node.children[0].value[1:]
-        literal = node.children[1].value[1:]
+    if node_type == 'literal_match':
+        variable = childs[0].value[1:]
+        literal = childs[1].value
         return kwargs[variable] == literal
 
 
-def make_transformation_from_tree(tree):
+def make_transformation_from_string(parser, string):
+    tree = parser.parse(string)
     variables = [atom.children[0].value[1:] for atom in tree.find_data('atomic')]
-
     def transformation(**kwargs):
         return evaluate_node(tree, **kwargs)
+    return variables, transformation
 
-    return transformation
+
+PARSER = make_parser()
